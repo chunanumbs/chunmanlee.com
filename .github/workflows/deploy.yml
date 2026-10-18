@@ -42,16 +42,24 @@ jobs:
             echo "deploy_dir=." >> $GITHUB_OUTPUT
           fi
 
-      - name: Start ssh-agent and add private key
-        uses: webfactory/ssh-agent@v0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Add known_hosts
+      - name: Prepare SSH (write key + known_hosts and add to ssh-agent)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          # write private key
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # write known_hosts
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          # start agent and add key
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/deploy_key
+          # verify ssh config
+          ssh-add -l || true
+          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes -F /dev/null -p 22 -i ~/.ssh/deploy_key ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} 'echo "SSH connectivity verified"' || true
 
       - name: Rsync to remote server
         env:
@@ -62,7 +70,7 @@ jobs:
         run: |
           DEPLOY_DIR="${{ steps.deploydir.outputs.deploy_dir }}"
           echo "Deploying directory: $DEPLOY_DIR"
-          rsync -avz --delete --exclude='.git' -e "ssh -p $REMOTE_PORT -o StrictHostKeyChecking=yes" "$DEPLOY_DIR/" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH"
+          rsync -avz --delete --exclude='.git' -e "ssh -i ~/.ssh/deploy_key -p $REMOTE_PORT -o StrictHostKeyChecking=yes" "$DEPLOY_DIR/" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH"
 
       - name: Remote post-deploy (listing)
         env:
@@ -71,4 +79,4 @@ jobs:
           REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
           REMOTE_PATH: ${{ secrets.REMOTE_PATH }}
         run: |
-          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_HOST "ls -la $REMOTE_PATH || true"
+          ssh -i ~/.ssh/deploy_key -p $REMOTE_PORT $REMOTE_USER@$REMOTE_HOST "ls -la $REMOTE_PATH || true"
