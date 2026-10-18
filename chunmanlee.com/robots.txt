@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /pcc/
-Sitemap: https://chunmanlee.com/sitemap.xml
