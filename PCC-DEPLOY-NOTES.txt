@@ -1,0 +1,16 @@
+PCC LIVE DEPLOYMENT PACKAGE
+
+Upload the enclosed pcc directory to the public web root for chunmanlee.com.
+The expected live location is:
+https://www.chunmanlee.com/pcc/
+
+Requirements:
+- Apache with mod_rewrite enabled
+- PHP 8.0 or newer
+- HTTPS enabled (the access cookie is Secure)
+- PHP mail configured if the protected contact form will be used
+
+The PCC directory is password protected and sends noindex/nofollow headers.
+The robots.txt file also disallows the entire protected directory.
+
+Do not rename or omit the .htaccess file when uploading.
